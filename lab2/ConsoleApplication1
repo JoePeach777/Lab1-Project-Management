@@ -1,0 +1,149 @@
+#include <iostream>
+#include <vector>
+#include <functional>
+#include <chrono>
+#include <algorithm>
+#include <string>
+
+using namespace std;
+using namespace std::chrono;
+
+
+template <typename T>
+int linearSearch(const T arr[], int n, const T& key) {
+    for (int i = 0; i < n; ++i) {
+        if (arr[i] == key) {
+            return i; // Возвращаем индекс найденного элемента
+        }
+    }
+    return -1; // Элемент не найден
+}
+
+// 2. СРЕДНИЙ УРОВЕНЬ (Вариант 9): Шаблонный класс Filter<T>
+
+template <typename T>
+class Filter {
+private:
+    // Вектор предикатов (условий), каждое из которых принимает T и возвращает bool
+    vector<function<bool(const T&)>> conditions;
+
+public:
+    // Конструктор по умолчанию: O(1)
+    Filter() = default;
+
+    // Конструктор с начальным условием: O(1) амортизированно
+    explicit Filter(function<bool(const T&)> initialCondition) {
+        conditions.push_back(initialCondition);
+    }
+
+    // Добавление нового условия фильтрации
+    // Временная сложность: O(1) амортизированно (O(k) при реаллокации вектора, где k - число условий)
+    // Пространственная сложность: O(1)
+    void addCondition(function<bool(const T&)> cond) {
+        conditions.push_back(cond);
+    }
+
+    // Применение всех условий к входному массиву данных
+    // Временная сложность: O(n * k), где n — размер входного вектора, k — количество условий.
+    // Если количество условий k считать константой, сложность линейная: O(n).
+    // Пространственная сложность: O(m), где m <= n — количество элементов, прошедших фильтр.
+    vector<T> apply(const vector<T>& data) const {
+        vector<T> result;
+        // Резервируем память в худшем случае, чтобы избежать лишних реаллокаций
+        result.reserve(data.size());
+
+        for (const auto& item : data) {
+            bool passed = true;
+            for (const auto& cond : conditions) {
+                if (!cond(item)) {
+                    passed = false;
+                    break; // Ранний выход при невыполнении хотя бы одного условия
+                }
+            }
+            if (passed) {
+                result.push_back(item);
+            }
+        }
+        return result;
+    }
+};
+
+// Вспомогательная функция для замера времени (из методички)
+
+template <typename Func>
+long long measureTime(Func func) {
+    auto start = high_resolution_clock::now();
+    func();
+    auto end = high_resolution_clock::now();
+    return duration_cast<microseconds>(end - start).count();
+}
+
+int main() {
+    setlocale(LC_ALL, "ru");
+
+    // --- Демонстрация базового уровня (разные типы данных) ---
+    cout << "=== 1. Тест линейного поиска (базовый уровень) ===" << endl;
+    int intArr[] = { 10, 25, 30, 45, 50 };
+    string strArr[] = { "C++", "Python", "Rust", "Django" };
+
+    cout << "Индекс 30 в intArr: " << linearSearch(intArr, 5, 30) << endl;
+    cout << "Индекс 'Rust' в strArr: " << linearSearch(strArr, 4, string("Rust")) << "\n\n";
+
+    // --- Демонстрация среднего уровня: работа с Filter<T> ---
+    cout << "=== 2. Тест шаблонного класса Filter<T> ===" << endl;
+    vector<int> numbers = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 15, 20 };
+
+    Filter<int> numFilter;
+    numFilter.addCondition([](int x) { return x % 2 == 0; }); // Только чётные
+    numFilter.addCondition([](int x) { return x > 5; });      // И больше 5
+
+    vector<int> filtered = numFilter.apply(numbers);
+    cout << "Отфильтрованные числа (чётные и > 5): ";
+    for (int x : filtered) cout << x << " ";
+    cout << "\n\n";
+
+    // Тест со строками (демонстрация шаблонности)
+    Filter<string> strFilter([](const string& s) { return s.length() > 4; });
+    vector<string> words = { "cat", "algorithm", "code", "template", "complexity" };
+    vector<string> longWords = strFilter.apply(words);
+    cout << "Слова длиннее 4 символов: ";
+    for (const auto& w : longWords) cout << w << " ";
+    cout << "\n\n";
+
+    //  Экспериментальное сравнение производительности
+    // Сравниваем наш Filter<int> (с хранением std::function) и стандартный std::copy_if с лямбдой
+    cout << "=== 3. Сравнение производительности: Filter<T> vs std::copy_if ===" << endl;
+    cout << "Размер массива\tFilter<T> (мкс)\tstd::copy_if (мкс)" << endl;
+
+    vector<int> sizes = { 10000, 100000, 500000, 1000000 };
+
+    Filter<int> benchFilter;
+    benchFilter.addCondition([](int x) { return x % 2 == 0; });
+    benchFilter.addCondition([](int x) { return x % 3 == 0; });
+
+    for (int n : sizes) {
+        vector<int> testData(n);
+        for (int i = 0; i < n; ++i) testData[i] = i;
+
+        // Замер 1: Наш класс Filter<T>
+        long long filterTime = measureTime([&]() {
+            volatile size_t sink = benchFilter.apply(testData).size();
+            (void)sink;
+            });
+
+        // Замер 2: Стандартный алгоритм std::copy_if с прямым условием (без накладных расходов std::function)
+        long long stlTime = measureTime([&]() {
+            vector<int> res;
+            res.reserve(testData.size());
+            copy_if(testData.begin(), testData.end(), back_inserter(res), [](int x) {
+                return (x % 2 == 0) && (x % 3 == 0);
+                });
+            volatile size_t sink = res.size();
+            (void)sink;
+            });
+
+        cout << n << "\t\t" << filterTime << "\t\t" << stlTime << endl;
+    }
+
+    return 0;
+}
