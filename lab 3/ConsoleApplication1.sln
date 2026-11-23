@@ -1,31 +1,216 @@
-﻿
-Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio Version 17
-VisualStudioVersion = 17.11.35303.130
-MinimumVisualStudioVersion = 10.0.40219.1
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ConsoleApplication1", "ConsoleApplication1\ConsoleApplication1.vcxproj", "{A91AE5B6-1135-445B-8EC8-41FDAF4F3F1E}"
-EndProject
-Global
-	GlobalSection(SolutionConfigurationPlatforms) = preSolution
-		Debug|x64 = Debug|x64
-		Debug|x86 = Debug|x86
-		Release|x64 = Release|x64
-		Release|x86 = Release|x86
-	EndGlobalSection
-	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{A91AE5B6-1135-445B-8EC8-41FDAF4F3F1E}.Debug|x64.ActiveCfg = Debug|x64
-		{A91AE5B6-1135-445B-8EC8-41FDAF4F3F1E}.Debug|x64.Build.0 = Debug|x64
-		{A91AE5B6-1135-445B-8EC8-41FDAF4F3F1E}.Debug|x86.ActiveCfg = Debug|Win32
-		{A91AE5B6-1135-445B-8EC8-41FDAF4F3F1E}.Debug|x86.Build.0 = Debug|Win32
-		{A91AE5B6-1135-445B-8EC8-41FDAF4F3F1E}.Release|x64.ActiveCfg = Release|x64
-		{A91AE5B6-1135-445B-8EC8-41FDAF4F3F1E}.Release|x64.Build.0 = Release|x64
-		{A91AE5B6-1135-445B-8EC8-41FDAF4F3F1E}.Release|x86.ActiveCfg = Release|Win32
-		{A91AE5B6-1135-445B-8EC8-41FDAF4F3F1E}.Release|x86.Build.0 = Release|Win32
-	EndGlobalSection
-	GlobalSection(SolutionProperties) = preSolution
-		HideSolutionNode = FALSE
-	EndGlobalSection
-	GlobalSection(ExtensibilityGlobals) = postSolution
-		SolutionGuid = {984C5F65-67DB-4FFC-9700-201A99FF5876}
-	EndGlobalSection
-EndGlobal
+#include <iostream>
+#include <stdexcept>
+#include <utility> // для std::swap и std::move
+
+template <typename T>
+class Vector {
+private:
+    T* data;    // Указатель на динамический массив элементов
+    int sz;     // Текущее количество элементов (size)
+    int cap;    // Выделенная ёмкость памяти (capacity)
+
+public:
+    // 1. Конструктор по умолчанию
+    Vector() : data(nullptr), sz(0), cap(0) {}
+
+    // 2. Конструктор с параметром (размер)
+    explicit Vector(int n) : sz(n), cap(n) {
+        if (n < 0) {
+            throw std::invalid_argument("Размер вектора не может быть отрицательным");
+        }
+        data = (cap > 0) ? new T[cap]() : nullptr;
+    }
+
+    // 3. Конструктор с параметрами (размер и значение по умолчанию)
+    Vector(int n, const T& val) : sz(n), cap(n) {
+        if (n < 0) {
+            throw std::invalid_argument("Размер вектора не может быть отрицательным");
+        }
+        data = (cap > 0) ? new T[cap] : nullptr;
+        for (int i = 0; i < sz; ++i) {
+            data[i] = val;
+        }
+    }
+
+    // 4. Деструктор
+    ~Vector() {
+        delete[] data;
+    }
+
+    // 5. Конструктор копирования (глубокое копирование)
+    Vector(const Vector& other) : sz(other.sz), cap(other.cap) {
+        data = (cap > 0) ? new T[cap] : nullptr;
+        for (int i = 0; i < sz; ++i) {
+            data[i] = other.data[i];
+        }
+    }
+
+    // 6. Оператор присваивания копированием (с проверкой на самоприсваивание)
+    Vector& operator=(const Vector& other) {
+        if (this != &other) { // Защита от самоприсваивания (v = v)
+            Vector temp(other); // Создаём временную копию
+            swap(temp);         // Меняем содержимое текущего объекта и копии
+        }
+        return *this;
+    }
+
+    // 7. Конструктор перемещения
+    Vector(Vector&& other) noexcept
+        : data(other.data), sz(other.sz), cap(other.cap) {
+        other.data = nullptr;
+        other.sz = 0;
+        other.cap = 0;
+    }
+
+    // 8. Оператор присваивания перемещением
+    Vector& operator=(Vector&& other) noexcept {
+        if (this != &other) { // Защита от самоприсваивания
+            delete[] data;    // Освобождаем старую память
+            data = other.data;
+            sz = other.sz;
+            cap = other.cap;
+
+            // Обнуляем источник
+            other.data = nullptr;
+            other.sz = 0;
+            other.cap = 0;
+        }
+        return *this;
+    }
+
+
+    // Обмен содержимым двух векторов за O(1)
+    void swap(Vector& other) noexcept {
+        std::swap(data, other.data);
+        std::swap(sz, other.sz);
+        std::swap(cap, other.cap);
+    }
+
+
+    int size() const { return sz; }
+    int capacity() const { return cap; }
+    bool empty() const { return sz == 0; }
+
+    // Доступ по индексу с проверкой границ
+    T& operator[](int index) {
+        if (index < 0 || index >= sz) {
+            throw std::out_of_range("Индекс выходит за границы вектора");
+        }
+        return data[index];
+    }
+
+    const T& operator[](int index) const {
+        if (index < 0 || index >= sz) {
+            throw std::out_of_range("Индекс выходит за границы вектора");
+        }
+        return data[index];
+    }
+
+    // Доступ к первому и последнему элементам (из базового 9 варианта)
+    T& front() {
+        if (empty()) throw std::underflow_error("Вектор пуст");
+        return data[0];
+    }
+
+    T& back() {
+        if (empty()) throw std::underflow_error("Вектор пуст");
+        return data[sz - 1];
+    }
+
+    // Резервирование памяти
+    void reserve(int newCap) {
+        if (newCap <= cap) return;
+        T* newData = new T[newCap];
+        for (int i = 0; i < sz; ++i) {
+            newData[i] = std::move(data[i]);
+        }
+        delete[] data;
+        data = newData;
+        cap = newCap;
+    }
+
+    // Добавление элемента в конец (стратегия удвоения ёмкости)
+    void push_back(const T& value) {
+        if (sz >= cap) {
+            int newCap = (cap == 0) ? 1 : cap * 2;
+            reserve(newCap);
+        }
+        data[sz++] = value;
+    }
+
+    // Удаление последнего элемента
+    void pop_back() {
+        if (empty()) {
+            throw std::underflow_error("Невозможно выполнить pop_back: вектор пуст");
+        }
+        --sz;
+    }
+
+    // Очистка вектора
+    void clear() {
+        sz = 0;
+    }
+
+    // Вывод элементов в консоль
+    void print() const {
+        std::cout << "[";
+        for (int i = 0; i < sz; ++i) {
+            std::cout << data[i] << (i < sz - 1 ? ", " : "");
+        }
+        std::cout << "]";
+    }
+};
+
+int main() {
+    setlocale(LC_ALL, "Russian");
+
+    try {
+        std::cout << "=== 1. Базовые операции (push_back, pop_back, front, back) ===\n";
+        Vector<int> v1;
+        v1.push_back(10);
+        v1.push_back(20);
+        v1.push_back(30);
+        std::cout << "v1: "; v1.print();
+        std::cout << " | size: " << v1.size() << ", capacity: " << v1.capacity() << "\n";
+        std::cout << "front: " << v1.front() << ", back: " << v1.back() << "\n";
+
+        v1.pop_back();
+        std::cout << "v1 после pop_back: "; v1.print(); std::cout << "\n\n";
+
+        std::cout << "=== 2. Проверка метода swap (Вариант 9) ===\n";
+        Vector<int> v2(3, 99);
+        std::cout << "До swap:\n  v1 = "; v1.print();
+        std::cout << "\n  v2 = "; v2.print(); std::cout << "\n";
+
+        v1.swap(v2);
+
+        std::cout << "После v1.swap(v2):\n  v1 = "; v1.print();
+        std::cout << "\n  v2 = "; v2.print(); std::cout << "\n\n";
+
+        std::cout << "=== 3. Проверка Правила пяти ===\n";
+        // Конструктор копирования
+        Vector<int> vCopy(v1);
+        std::cout << "vCopy (копия v1): "; vCopy.print(); std::cout << "\n";
+
+        // Присваивание копированием + самоприсваивание
+        vCopy = vCopy; // Не должно сломаться
+        vCopy = v2;
+        std::cout << "vCopy после присваивания v2: "; vCopy.print(); std::cout << "\n";
+
+        // Конструктор перемещения
+        Vector<int> vMoved(std::move(v1));
+        std::cout << "vMoved (перемещён из v1): "; vMoved.print(); std::cout << "\n";
+        std::cout << "v1 после перемещения: "; v1.print();
+        std::cout << " (size=" << v1.size() << ", cap=" << v1.capacity() << ")\n\n";
+
+        std::cout << "=== 4. Проверка обработки ошибок ===\n";
+        std::cout << "Попытка обратиться к несуществующему индексу vMoved[100]...\n";
+        std::cout << vMoved[100] << "\n";
+
+    }
+    catch (const std::exception& e) {
+        std::cerr << "Поймано исключение: " << e.what() << "\n";
+    }
+
+    return 0;
+}
