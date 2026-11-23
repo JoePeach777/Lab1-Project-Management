@@ -1,0 +1,536 @@
+#include <iostream>
+#include <string>
+#include <stdexcept>
+
+// 1. СТЕК И ПРОВЕРКА HTML-РАЗМЕТКИ
+
+template <typename T>
+class Stack {
+private:
+    T* data;
+    int topIndex;
+    int capacity;
+
+    // Увеличение ёмкости массива вдвое при переполнении
+    void resize() {
+        int newCapacity = capacity * 2;
+        T* newData = new T[newCapacity];
+        for (int i = 0; i <= topIndex; ++i) {
+            newData[i] = data[i];
+        }
+        delete[] data;
+        data = newData;
+        capacity = newCapacity;
+    }
+
+public:
+    Stack(int initialCapacity = 10) : capacity(initialCapacity), topIndex(-1) {
+        if (initialCapacity <= 0) capacity = 10;
+        data = new T[capacity];
+    }
+
+    ~Stack() {
+        delete[] data;
+    }
+
+    // Запрет копирования во избежание двойного освобождения памяти
+    Stack(const Stack&) = delete;
+    Stack& operator=(const Stack&) = delete;
+
+    void push(const T& value) {
+        if (topIndex >= capacity - 1) {
+            resize();
+        }
+        data[++topIndex] = value;
+    }
+
+    T pop() {
+        if (isEmpty()) {
+            throw std::underflow_error("Ошибка: попытка pop() из пустого стека");
+        }
+        return data[topIndex--];
+    }
+
+    T top() const {
+        if (isEmpty()) {
+            throw std::underflow_error("Ошибка: попытка top() из пустого стека");
+        }
+        return data[topIndex];
+    }
+
+    bool isEmpty() const {
+        return topIndex == -1;
+    }
+
+    int size() const {
+        return topIndex + 1;
+    }
+};
+
+// Задача 1: Проверка корректности HTML-тегов (учитывает атрибуты, например <div class="a">)
+bool checkHtmlTags(const std::string& html) {
+    Stack<std::string> tagStack;
+    size_t i = 0;
+    size_t n = html.length();
+
+    while (i < n) {
+        if (html[i] == '<') {
+            size_t closeBracket = html.find('>', i);
+            if (closeBracket == std::string::npos) {
+                return false; // Незакрытая угловая скобка
+            }
+
+            std::string tagContent = html.substr(i + 1, closeBracket - i - 1);
+            if (tagContent.empty()) {
+                return false; // Пустой тег <>
+            }
+
+            // Игнорируем самозакрывающиеся теги вида <br/> или <img ... />
+            if (tagContent.back() == '/') {
+                i = closeBracket + 1;
+                continue;
+            }
+
+            bool isClosing = (tagContent[0] == '/');
+            size_t nameStart = isClosing ? 1 : 0;
+
+            // Извлекаем только имя тега до первого пробела (отбрасываем атрибуты)
+            size_t spacePos = tagContent.find(' ', nameStart);
+            std::string tagName = (spacePos == std::string::npos)
+                ? tagContent.substr(nameStart)
+                : tagContent.substr(nameStart, spacePos - nameStart);
+
+            if (tagName.empty()) {
+                return false;
+            }
+
+            if (isClosing) {
+                if (tagStack.isEmpty() || tagStack.pop() != tagName) {
+                    return false; // Нет открывающего тега или несовпадение имён
+                }
+            }
+            else {
+                tagStack.push(tagName);
+            }
+
+            i = closeBracket + 1;
+        }
+        else {
+            ++i; // Пропускаем обычный текст внутри тегов
+        }
+    }
+
+    return tagStack.isEmpty(); // Все открытые теги должны быть закрыты
+}
+
+// 2. ОЧЕРЕДЬ И УДАЛЕНИЕ ЧЁТНЫХ ЭЛЕМЕНТОВ
+
+
+template <typename T>
+class Queue {
+private:
+    T* data;
+    int frontIndex;
+    int rearIndex;
+    int count;
+    int capacity;
+
+    void resize() {
+        int newCapacity = capacity * 2;
+        T* newData = new T[newCapacity];
+        for (int i = 0; i < count; ++i) {
+            newData[i] = data[(frontIndex + i) % capacity];
+        }
+        delete[] data;
+        data = newData;
+        frontIndex = 0;
+        rearIndex = count;
+        capacity = newCapacity;
+    }
+
+public:
+    Queue(int initialCapacity = 10)
+        : capacity(initialCapacity), frontIndex(0), rearIndex(0), count(0) {
+        if (initialCapacity <= 0) capacity = 10;
+        data = new T[capacity];
+    }
+
+    ~Queue() {
+        delete[] data;
+    }
+
+    Queue(const Queue&) = delete;
+    Queue& operator=(const Queue&) = delete;
+
+    void enqueue(const T& value) {
+        if (count >= capacity) {
+            resize();
+        }
+        data[rearIndex] = value;
+        rearIndex = (rearIndex + 1) % capacity;
+        ++count;
+    }
+
+    T dequeue() {
+        if (isEmpty()) {
+            throw std::underflow_error("Ошибка: попытка dequeue() из пустой очереди");
+        }
+        T value = data[frontIndex];
+        frontIndex = (frontIndex + 1) % capacity;
+        --count;
+        return value;
+    }
+
+    T front() const {
+        if (isEmpty()) {
+            throw std::underflow_error("Ошибка: попытка front() из пустой очереди");
+        }
+        return data[frontIndex];
+    }
+
+    bool isEmpty() const {
+        return count == 0;
+    }
+
+    int size() const {
+        return count;
+    }
+};
+
+// Задача 2: Удалить все чётные элементы из очереди без доп. структур
+void removeEvenFromQueue(Queue<int>& q) {
+    int initialSize = q.size();
+    for (int i = 0; i < initialSize; ++i) {
+        int val = q.dequeue();
+        if (val % 2 != 0) {
+            q.enqueue(val); // Возвращаем в конец очереди только нечётные
+        }
+    }
+}
+
+
+// 3. ДЕК И ПРОВЕРКА НА ПАЛИНДРОМ
+
+template <typename T>
+class Deque {
+private:
+    struct Node {
+        T data;
+        Node* prev;
+        Node* next;
+        Node(const T& value) : data(value), prev(nullptr), next(nullptr) {}
+    };
+
+    Node* head;
+    Node* tail;
+    int count;
+
+public:
+    Deque() : head(nullptr), tail(nullptr), count(0) {}
+
+    ~Deque() {
+        while (head != nullptr) {
+            Node* temp = head;
+            head = head->next;
+            delete temp;
+        }
+    }
+
+    Deque(const Deque&) = delete;
+    Deque& operator=(const Deque&) = delete;
+
+    void push_front(const T& value) {
+        Node* newNode = new Node(value);
+        if (head == nullptr) {
+            head = tail = newNode;
+        }
+        else {
+            newNode->next = head;
+            head->prev = newNode;
+            head = newNode;
+        }
+        ++count;
+    }
+
+    void push_back(const T& value) {
+        Node* newNode = new Node(value);
+        if (tail == nullptr) {
+            head = tail = newNode;
+        }
+        else {
+            tail->next = newNode;
+            newNode->prev = tail;
+            tail = newNode;
+        }
+        ++count;
+    }
+
+    T pop_front() {
+        if (isEmpty()) {
+            throw std::underflow_error("Ошибка: попытка pop_front() из пустого дека");
+        }
+        Node* temp = head;
+        T value = temp->data;
+        head = head->next;
+        if (head != nullptr) {
+            head->prev = nullptr;
+        }
+        else {
+            tail = nullptr;
+        }
+        delete temp;
+        --count;
+        return value;
+    }
+
+    T pop_back() {
+        if (isEmpty()) {
+            throw std::underflow_error("Ошибка: попытка pop_back() из пустого дека");
+        }
+        Node* temp = tail;
+        T value = temp->data;
+        tail = tail->prev;
+        if (tail != nullptr) {
+            tail->next = nullptr;
+        }
+        else {
+            head = nullptr;
+        }
+        delete temp;
+        --count;
+        return value;
+    }
+
+    T front() const {
+        if (isEmpty()) {
+            throw std::underflow_error("Ошибка: попытка front() из пустого дека");
+        }
+        return head->data;
+    }
+
+    T back() const {
+        if (isEmpty()) {
+            throw std::underflow_error("Ошибка: попытка back() из пустого дека");
+        }
+        return tail->data;
+    }
+
+    bool isEmpty() const {
+        return count == 0;
+    }
+
+    int size() const {
+        return count;
+    }
+};
+
+// Задача 3: Проверить, является ли дек палиндромом (с сохранением элементов дека)
+template <typename T>
+bool isDequePalindrome(Deque<T>& dq) {
+    if (dq.size() <= 1) return true;
+
+    bool result = true;
+    int halfSize = dq.size() / 2;
+    Deque<T> leftHalf;
+    Deque<T> rightHalf;
+
+    // Сравниваем элементы с обоих концов, сохраняя их для последующего восстановления
+    for (int i = 0; i < halfSize; ++i) {
+        T lVal = dq.pop_front();
+        T rVal = dq.pop_back();
+        if (lVal != rVal) {
+            result = false;
+        }
+        leftHalf.push_back(lVal);
+        rightHalf.push_front(rVal);
+    }
+
+    // Восстанавливаем исходное состояние дека
+    while (!leftHalf.isEmpty()) {
+        dq.push_front(leftHalf.pop_back());
+    }
+    while (!rightHalf.isEmpty()) {
+        dq.push_back(rightHalf.pop_front());
+    }
+
+    return result;
+}
+
+
+// 4. ПРИОРИТЕТНАЯ ОЧЕРЕДЬ ИЗ МАССИВА (MAX-HEAP)
+
+template <typename T>
+class PriorityQueue {
+private:
+    T* heap;
+    int count;
+    int capacity;
+
+    void resize() {
+        int newCapacity = capacity * 2;
+        T* newHeap = new T[newCapacity];
+        for (int i = 0; i < count; ++i) {
+            newHeap[i] = heap[i];
+        }
+        delete[] heap;
+        heap = newHeap;
+        capacity = newCapacity;
+    }
+
+    void heapifyUp(int index) {
+        while (index > 0) {
+            int parent = (index - 1) / 2;
+            if (heap[index] > heap[parent]) {
+                std::swap(heap[index], heap[parent]);
+                index = parent;
+            }
+            else {
+                break;
+            }
+        }
+    }
+
+    void heapifyDown(int index) {
+        while (true) {
+            int left = 2 * index + 1;
+            int right = 2 * index + 2;
+            int largest = index;
+
+            if (left < count && heap[left] > heap[largest]) {
+                largest = left;
+            }
+            if (right < count && heap[right] > heap[largest]) {
+                largest = right;
+            }
+            if (largest == index) {
+                break;
+            }
+            std::swap(heap[index], heap[largest]);
+            index = largest;
+        }
+    }
+
+public:
+    PriorityQueue(int initialCapacity = 10) : capacity(initialCapacity), count(0) {
+        if (initialCapacity <= 0) capacity = 10;
+        heap = new T[capacity];
+    }
+
+    // Задача 4: Построение приоритетной очереди из произвольного массива за O(n)
+    PriorityQueue(const T* arr, int n) {
+        if (n < 0) throw std::invalid_argument("Размер массива не может быть отрицательным");
+        capacity = (n > 0) ? n * 2 : 10;
+        count = n;
+        heap = new T[capacity];
+
+        for (int i = 0; i < n; ++i) {
+            heap[i] = arr[i];
+        }
+
+        // Просеиваем вниз все внутренние узлы, начиная с последнего родителя (алгоритм Флойда)
+        for (int i = (count / 2) - 1; i >= 0; --i) {
+            heapifyDown(i);
+        }
+    }
+
+    ~PriorityQueue() {
+        delete[] heap;
+    }
+
+    PriorityQueue(const PriorityQueue&) = delete;
+    PriorityQueue& operator=(const PriorityQueue&) = delete;
+
+    void push(const T& value) {
+        if (count >= capacity) {
+            resize();
+        }
+        heap[count] = value;
+        heapifyUp(count);
+        ++count;
+    }
+
+    T pop() {
+        if (isEmpty()) {
+            throw std::underflow_error("Ошибка: попытка pop() из пустой приоритетной очереди");
+        }
+        T maxValue = heap[0];
+        heap[0] = heap[count - 1];
+        --count;
+        if (count > 0) {
+            heapifyDown(0);
+        }
+        return maxValue;
+    }
+
+    T top() const {
+        if (isEmpty()) {
+            throw std::underflow_error("Ошибка: попытка top() из пустой приоритетной очереди");
+        }
+        return heap[0];
+    }
+
+    bool isEmpty() const {
+        return count == 0;
+    }
+
+    int size() const {
+        return count;
+    }
+};
+
+// ДЕМОНСТРАЦИЯ РАБОТЫ И ТЕСТИРОВАНИЕ
+
+int main() {
+    setlocale(LC_ALL, "Russian");
+
+    std::cout << "=== 1. СТЕК: Проверка HTML-разметки ===\n";
+    std::string html1 = "<div><p>Текст</p><br/></div>";
+    std::string html2 = "<div class=\"box\"><span>Ошибка</div></span>";
+    std::string html3 = "<html><body><h1>Заголовок";
+    std::cout << html1 << " -> " << (checkHtmlTags(html1) ? "ВЕРНО" : "НЕВЕРНО") << "\n";
+    std::cout << html2 << " -> " << (checkHtmlTags(html2) ? "ВЕРНО" : "НЕВЕРНО") << "\n";
+    std::cout << html3 << " -> " << (checkHtmlTags(html3) ? "ВЕРНО" : "НЕВЕРНО") << "\n\n";
+
+    std::cout << "=== 2. ОЧЕРЕДЬ: Удаление чётных элементов ===\n";
+    Queue<int> q;
+    int nums[] = { 10, 15, 22, 33, 40, 51, 7 };
+    for (int x : nums) q.enqueue(x);
+    removeEvenFromQueue(q);
+    std::cout << "После удаления чётных: ";
+    while (!q.isEmpty()) {
+        std::cout << q.dequeue() << " ";
+    }
+    std::cout << "\n\n";
+
+    std::cout << "=== 3. ДЕК: Проверка на палиндром ===\n";
+    Deque<int> dq1;
+    dq1.push_back(1); dq1.push_back(2); dq1.push_back(3); dq1.push_back(2); dq1.push_back(1);
+    std::cout << "Дек [1, 2, 3, 2, 1] палиндром? " << (isDequePalindrome(dq1) ? "ДА" : "НЕТ")
+        << " (размер после проверки: " << dq1.size() << ")\n";
+
+    Deque<int> dq2;
+    dq2.push_back(1); dq2.push_back(2); dq2.push_back(3);
+    std::cout << "Дек [1, 2, 3] палиндром? " << (isDequePalindrome(dq2) ? "ДА" : "НЕТ") << "\n\n";
+
+    std::cout << "=== 4. ПРИОРИТЕТНАЯ ОЧЕРЕДЬ: Построение из массива ===\n";
+    int rawArray[] = { 12, 45, 7, 89, 23, 56, 3 };
+    int arrSize = sizeof(rawArray) / sizeof(rawArray[0]);
+    PriorityQueue<int> pq(rawArray, arrSize);
+    pq.push(100);
+    std::cout << "Извлечение элементов по убыванию приоритета: ";
+    while (!pq.isEmpty()) {
+        std::cout << pq.pop() << " ";
+    }
+    std::cout << "\n\n";
+
+    std::cout << "=== 5. ПРОВЕРКА ИСКЛЮЧЕНИЙ ===\n";
+    try {
+        Stack<int> emptyStack;
+        emptyStack.pop();
+    }
+    catch (const std::exception& e) {
+        std::cout << "Перехвачено: " << e.what() << "\n";
+    }
+
+    return 0;
+}
