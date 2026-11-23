@@ -1,0 +1,362 @@
+#include <iostream>
+#include <stdexcept>
+
+
+// 1. ОДНОСВЯЗНЫЙ СПИСОК (Базовый уровень, вар. 9)
+
+template <typename T>
+class SinglyLinkedList {
+private:
+    struct Node {
+        T data;
+        Node* next;
+        Node(const T& value) : data(value), next(nullptr) {}
+    };
+
+    Node* head;
+    Node* tail;
+    int count;
+
+public:
+    SinglyLinkedList() : head(nullptr), tail(nullptr), count(0) {}
+
+    ~SinglyLinkedList() {
+        clear();
+    }
+
+    // Вставка в конец O(1)
+    void push_back(const T& value) {
+        Node* newNode = new Node(value);
+        if (head == nullptr) {
+            head = tail = newNode;
+        }
+        else {
+            tail->next = newNode;
+            tail = newNode;
+        }
+        count++;
+    }
+
+    // Поиск по значению O(n)
+    Node* find(const T& value) const {
+        Node* current = head;
+        while (current != nullptr) {
+            if (current->data == value) return current;
+            current = current->next;
+        }
+        return nullptr;
+    }
+
+    // Удаление первого вхождения по значению O(n)
+    bool remove(const T& value) {
+        if (head == nullptr) return false;
+
+        if (head->data == value) {
+            Node* temp = head;
+            head = head->next;
+            if (head == nullptr) tail = nullptr;
+            delete temp;
+            count--;
+            return true;
+        }
+
+        Node* current = head;
+        while (current->next != nullptr && current->next->data != value) {
+            current = current->next;
+        }
+
+        if (current->next == nullptr) return false;
+
+        Node* toDelete = current->next;
+        current->next = toDelete->next;
+        if (toDelete == tail) tail = current;
+        delete toDelete;
+        count--;
+        return true;
+    }
+
+    // Доп. задание (вар. 9): Удалить все нечётные элементы O(n)
+    void removeOdd() {
+        // Удаляем нечётные элементы с начала списка
+        while (head != nullptr && head->data % 2 != 0) {
+            Node* temp = head;
+            head = head->next;
+            delete temp;
+            count--;
+        }
+
+        if (head == nullptr) {
+            tail = nullptr;
+            return;
+        }
+
+        // Удаляем нечётные элементы из середины и конца
+        Node* current = head;
+        while (current->next != nullptr) {
+            if (current->next->data % 2 != 0) {
+                Node* toDelete = current->next;
+                current->next = toDelete->next;
+                if (toDelete == tail) tail = current;
+                delete toDelete;
+                count--;
+            }
+            else {
+                current = current->next;
+            }
+        }
+    }
+
+    void print() const {
+        Node* current = head;
+        std::cout << "[";
+        while (current != nullptr) {
+            std::cout << current->data;
+            if (current->next != nullptr) std::cout << ", ";
+            current = current->next;
+        }
+        std::cout << "]" << std::endl;
+    }
+
+    void clear() {
+        while (head != nullptr) {
+            Node* temp = head;
+            head = head->next;
+            delete temp;
+        }
+        tail = nullptr;
+        count = 0;
+    }
+
+    int size() const { return count; }
+    bool empty() const { return head == nullptr; }
+};
+
+
+// 2. ДВУСВЯЗНЫЙ СПИСОК 
+
+template <typename T>
+class DoublyLinkedList {
+private:
+    struct DNode {
+        T data;
+        DNode* prev;
+        DNode* next;
+        DNode(const T& value) : data(value), prev(nullptr), next(nullptr) {}
+    };
+
+    DNode* head;
+    DNode* tail;
+    int count;
+
+public:
+    DoublyLinkedList() : head(nullptr), tail(nullptr), count(0) {}
+
+    // Конструктор копирования (нужен для корректного возврата списка из intersection)
+    DoublyLinkedList(const DoublyLinkedList& other) : head(nullptr), tail(nullptr), count(0) {
+        DNode* current = other.head;
+        while (current != nullptr) {
+            push_back(current->data);
+            current = current->next;
+        }
+    }
+
+    // Оператор присваивания
+    DoublyLinkedList& operator=(const DoublyLinkedList& other) {
+        if (this != &other) {
+            clear();
+            DNode* current = other.head;
+            while (current != nullptr) {
+                push_back(current->data);
+                current = current->next;
+            }
+        }
+        return *this;
+    }
+
+    ~DoublyLinkedList() {
+        clear();
+    }
+
+    // Вставка в начало O(1)
+    void push_front(const T& value) {
+        DNode* newNode = new DNode(value);
+        if (head == nullptr) {
+            head = tail = newNode;
+        }
+        else {
+            newNode->next = head;
+            head->prev = newNode;
+            head = newNode;
+        }
+        count++;
+    }
+
+    // Вставка в конец O(1)
+    void push_back(const T& value) {
+        DNode* newNode = new DNode(value);
+        if (tail == nullptr) {
+            head = tail = newNode;
+        }
+        else {
+            tail->next = newNode;
+            newNode->prev = tail;
+            tail = newNode;
+        }
+        count++;
+    }
+
+    // Удаление из начала O(1)
+    void pop_front() {
+        if (head == nullptr) throw std::underflow_error("List is empty");
+        DNode* temp = head;
+        head = head->next;
+        if (head != nullptr) head->prev = nullptr;
+        else tail = nullptr;
+        delete temp;
+        count--;
+    }
+
+    // Удаление из конца O(1)
+    void pop_back() {
+        if (tail == nullptr) throw std::underflow_error("List is empty");
+        DNode* temp = tail;
+        tail = tail->prev;
+        if (tail != nullptr) tail->next = nullptr;
+        else head = nullptr;
+        delete temp;
+        count--;
+    }
+
+    // Поиск по значению O(n)
+    DNode* find(const T& value) const {
+        DNode* current = head;
+        while (current != nullptr) {
+            if (current->data == value) return current;
+            current = current->next;
+        }
+        return nullptr;
+    }
+
+    // Удаление по значению O(n)
+    bool remove(const T& value) {
+        DNode* target = find(value);
+        if (target == nullptr) return false;
+
+        if (target == head) {
+            pop_front();
+        }
+        else if (target == tail) {
+            pop_back();
+        }
+        else {
+            target->prev->next = target->next;
+            target->next->prev = target->prev;
+            delete target;
+            count--;
+        }
+        return true;
+    }
+
+    // Доп. задание (вар. 9): Пересечение двух списков O(n * m)
+    DoublyLinkedList<T> intersection(const DoublyLinkedList<T>& other) const {
+        DoublyLinkedList<T> result;
+        DNode* current = head;
+
+        while (current != nullptr) {
+            // Если элемент есть во втором списке и ещё не добавлен в результат
+            if (other.find(current->data) != nullptr && result.find(current->data) == nullptr) {
+                result.push_back(current->data);
+            }
+            current = current->next;
+        }
+        return result;
+    }
+
+    void print() const {
+        DNode* current = head;
+        std::cout << "[";
+        while (current != nullptr) {
+            std::cout << current->data;
+            if (current->next != nullptr) std::cout << ", ";
+            current = current->next;
+        }
+        std::cout << "]" << std::endl;
+    }
+
+    void printReverse() const {
+        DNode* current = tail;
+        std::cout << "[";
+        while (current != nullptr) {
+            std::cout << current->data;
+            if (current->prev != nullptr) std::cout << ", ";
+            current = current->prev;
+        }
+        std::cout << "]" << std::endl;
+    }
+
+    void clear() {
+        while (head != nullptr) {
+            DNode* temp = head;
+            head = head->next;
+            delete temp;
+        }
+        tail = nullptr;
+        count = 0;
+    }
+
+    int size() const { return count; }
+    bool empty() const { return head == nullptr; }
+};
+
+int main() {
+    setlocale(LC_ALL, "ru");
+
+    std::cout << "=== 1. Тест односвязного списка (Базовый уровень, вар. 9) ===" << std::endl;
+    SinglyLinkedList<int> sList;
+    sList.push_back(1);
+    sList.push_back(2);
+    sList.push_back(3);
+    sList.push_back(4);
+    sList.push_back(5);
+    sList.push_back(6);
+
+    std::cout << "Исходный список: ";
+    sList.print();
+
+    std::cout << "Поиск элемента 4: " << (sList.find(4) != nullptr ? "найден" : "не найден") << std::endl;
+    sList.remove(2);
+    std::cout << "После remove(2): ";
+    sList.print();
+
+    sList.removeOdd();
+    std::cout << "После удаления всех нечётных (removeOdd): ";
+    sList.print();
+
+    std::cout << "\n=== 2. Тест двусвязного списка (Средний уровень, вар. 9) ===" << std::endl;
+    DoublyLinkedList<int> dList1;
+    dList1.push_back(10);
+    dList1.push_back(20);
+    dList1.push_back(30);
+    dList1.push_back(40);
+    dList1.push_back(20); // дубликат для проверки корректности пересечения
+
+    DoublyLinkedList<int> dList2;
+    dList2.push_back(30);
+    dList2.push_back(40);
+    dList2.push_back(50);
+    dList2.push_back(60);
+    dList2.push_back(20);
+
+    std::cout << "Список 1: ";
+    dList1.print();
+    std::cout << "Список 2: ";
+    dList2.print();
+
+    DoublyLinkedList<int> interList = dList1.intersection(dList2);
+    std::cout << "Пересечение списков (intersection): ";
+    interList.print();
+    std::cout << "Пересечение в обратном порядке (проверка prev и tail): ";
+    interList.printReverse();
+
+    return 0;
+}
